@@ -74,3 +74,15 @@ async function mergeChunks(outputFile) {
     outputStream.end();
 }
 
+(async function main() {
+    console.log('Разделение и сортировка кусочков...');
+    await splitAndSortFile(inputFile, maxChunkSize);
+
+    console.log('Соединение кусочков...');
+    await mergeChunks('sorted_largefile.txt');
+
+    console.log('Очистка временных файлов...');
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    console.log('Готово.');
+})();
