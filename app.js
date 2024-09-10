@@ -6,7 +6,6 @@ const sizeMB = 1;
 const maxChunkSize = sizeMB*1024*1024;  // in bytes
 const inputFile = 'largefile.txt';
 const outputFile = 'sorted_largefile.txt'
-const outputDir = './result';
 const tmpDir = path.join('./', 'sorted_chunks');
 if (!fs.existsSync(tmpDir)) {
     fs.mkdirSync(tmpDir);
@@ -79,7 +78,7 @@ async function mergeChunks(outputFile) {
     await splitAndSortFile(inputFile, maxChunkSize);
 
     console.log('Соединение кусочков...');
-    await mergeChunks('sorted_largefile.txt');
+    await mergeChunks(outputFile);
 
     console.log('Очистка временных файлов...');
     fs.rmSync(tmpDir, { recursive: true, force: true });
