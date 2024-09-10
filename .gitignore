@@ -1,1 +1,4 @@
 node_modules
+temp
+sorted_chunks
+largefile.txt
