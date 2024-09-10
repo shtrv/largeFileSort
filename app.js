@@ -3,7 +3,7 @@ const path = require('path');
 const readline = require('readline');
 
 const sizeMB = 1;
-const maxChunkSize = sizeMB*1024*1024;  // in bytes
+const maxChunkSize = sizeMB * 1024 * 1024;  // in bytes
 const inputFile = 'largefile.txt';
 const outputFile = 'sorted_largefile.txt'
 const tmpDir = path.join('./', 'sorted_chunks');
@@ -13,7 +13,7 @@ if (!fs.existsSync(tmpDir)) {
 
 async function splitAndSortFile(inputFile, maxChunkSize) {
     const fileStream = fs.createReadStream(inputFile);
-    const rl = readline.createInterface({input: fileStream});
+    const rl = readline.createInterface({ input: fileStream });
 
     let chunk = [];
     let chunkIndex = 0;
@@ -44,33 +44,60 @@ async function sortAndSaveChunk(chunk, chunkIndex) {
     fs.writeFileSync(sortedChunkFileName, chunk.join('\n'), 'utf-8')
 }
 
-async function mergeChunks(outputFile) {
-    const chunkFiles = fs.readdirSync(tmpDir).map(file => path.join(tmpDir, file));
+async function mergeTwoFiles(file1, file2, outputFile) {
+    const rl1 = readline.createInterface({
+        input: fs.createReadStream(file1, { encoding: 'utf8' }),
+    });
+    const rl2 = readline.createInterface({
+        input: fs.createReadStream(file2, { encoding: 'utf8' }),
+    });
     const outputStream = fs.createWriteStream(outputFile, { encoding: 'utf8' });
 
-    let chunkStreams = chunkFiles.map(file => readline.createInterface({ input: fs.createReadStream(file, { encoding: 'utf8' }) }));
-    let chunkLines = await Promise.all(chunkStreams.map(async stream => (await stream[Symbol.asyncIterator]().next()).value));
-    
-    while (chunkStreams.length > 0) {
-        let minIndex = 0;
-        for (let i = 1; i < chunkLines.length; i++) {
-            if (chunkLines[i] < chunkLines[minIndex]) {
-                minIndex = i;
-            }
-        }
+    let iterator1 = rl1[Symbol.asyncIterator]();
+    let iterator2 = rl2[Symbol.asyncIterator]();
 
-        outputStream.write(chunkLines[minIndex] + '\n');
-        const next = await chunkStreams[minIndex][Symbol.asyncIterator]().next();
+    let line1 = (await iterator1.next()).value;
+    let line2 = (await iterator2.next()).value;
 
-        if (next.done) {
-            chunkStreams.splice(minIndex, 1);
-            chunkLines.splice(minIndex, 1);
+    while (line1 !== undefined || line2 !== undefined) {
+        if (line1 === undefined) {
+            outputStream.write(line2 + '\n');
+            line2 = (await iterator2.next()).value;
+        } else if (line2 === undefined) {
+            outputStream.write(line1 + '\n');
+            line1 = (await iterator1.next()).value;
+        } else if (line1 < line2) {
+            outputStream.write(line1 + '\n');
+            line1 = (await iterator1.next()).value;
         } else {
-            chunkLines[minIndex] = next.value;
+            outputStream.write(line2 + '\n');
+            line2 = (await iterator2.next()).value;
         }
     }
 
+    rl1.close();
+    rl2.close();
     outputStream.end();
+}
+
+async function recursiveMerge(chunkFiles, level = 0) {
+    if (chunkFiles.length === 1) {
+        return chunkFiles[0];
+    }
+
+    let mergedFiles = [];
+
+    for (let i = 0; i < chunkFiles.length; i += 2) {
+        if (i + 1 < chunkFiles.length) {
+            const mergedFile = path.join(tmpDir, `merged_${level}_${i}.txt`);
+            await mergeTwoFiles(chunkFiles[i], chunkFiles[i + 1], mergedFile);
+            mergedFiles.push(mergedFile);
+        } else {
+            mergedFiles.push(chunkFiles[i]);
+        }
+    }
+
+    return await recursiveMerge(mergedFiles, level + 1);
 }
 
 (async function main() {
@@ -78,7 +105,11 @@ async function mergeChunks(outputFile) {
     await splitAndSortFile(inputFile, maxChunkSize);
 
     console.log('Соединение кусочков...');
-    await mergeChunks(outputFile);
+    const chunkFiles = fs.readdirSync(tmpDir).map(file => path.join(tmpDir, file));
+    const finalSortedFile = await recursiveMerge(chunkFiles);
+
+    // Переименовываем окончательный файл в выходное имя
+    fs.renameSync(finalSortedFile, outputFile);
 
     console.log('Очистка временных файлов...');
     fs.rmSync(tmpDir, { recursive: true, force: true });
