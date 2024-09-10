@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
-const maxChunkSize = 500*1024*1024;
+const sizeMB = 1;
+const maxChunkSize = sizeMB*1024*1024;  // in bytes
 const inputFile = 'largefile.txt';
 const outputFile = 'sorted_largefile.txt'
 const outputDir = './result';
@@ -40,8 +41,10 @@ async function splitAndSortFile(inputFile, maxChunkSize) {
 
 async function sortAndSaveChunk(chunk, chunkIndex) {
     chunk.sort();
-    const sortedChunkFileName = path.join(tmpDir, `${chunkIndex}`);
-    fs.writeFileSync(sortedChunkFileName, chunk.join('\n') + '\n', 'utf-8')
+    const sortedChunkFileName = path.join(tmpDir, `${chunkIndex}.txt`);
+    fs.writeFileSync(sortedChunkFileName, chunk.join('\n'), 'utf-8')
 }
+
+
 
 splitAndSortFile(inputFile, maxChunkSize);
